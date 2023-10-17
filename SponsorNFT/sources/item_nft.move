@@ -1,6 +1,6 @@
 module item::item_nft {
    use std::signer;
-   use std::option::{Self};
+   use std::option::{Self, Option};
    use std::error;
    use std::vector;
    use std::string::{Self, String};
@@ -99,25 +99,25 @@ module item::item_nft {
       next_token_id.id = next_id;
    }
 
-   public fun get_aura_amount(token_id: u256): u256 acquires FuseBlockInfos {
+   public fun get_aura_amount(token_id: u256): Option<u256> acquires FuseBlockInfos {
       let fuse_block_infos = borrow_global_mut<FuseBlockInfos>(@item);
-      let found_index = option::none<u64>();
+      let found_index = false;
+      let index = 0;
       vector::enumerate_ref(&fuse_block_infos.infos, |i, v| {
          let v: &FuseBlockInfo = v;
          
          if ( v.fuse_nft_id == token_id) {
-            found_index = option::some<u64>(i);
+            found_index = true;
+            index = i;
          };
       });
 
-      let found_amount = if (option::is_some<u64>(&found_index)) {
-        let unwrapped_idx = option::extract(&mut found_index);
-        vector::borrow(&fuse_block_infos.infos, unwrapped_idx).amount
+      if (found_index) {
+        let amount_found = vector::borrow(&fuse_block_infos.infos, index).amount;
+        option::some<u256>(amount_found)
       } else {
-        0
-      };
-      
-      found_amount
+        option::none<u256>()
+      }
    }
 
    /// This function handles creating the token, minting it to the specified `to` address,
