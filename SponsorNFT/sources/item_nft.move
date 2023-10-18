@@ -39,7 +39,7 @@ module item::item_nft {
    const COLLECTION_DESCRIPTION: vector<u8> = b"A collection of infused items";
    const COLLECTION_URI: vector<u8> = b"collection image uri";
    const TOKEN_URI: vector<u8> = b"token image uri";
-   const MAXIMUM_SUPPLY: u64 = 0;
+   const MAXIMUM_SUPPLY: u64 = 10; // can't be 0
 
    // const E_TOKEN_NOT_FOUND: u64 = 1;
 
@@ -73,7 +73,7 @@ module item::item_nft {
       admin: &signer,
       to: address,
       aura_amount: u256
-   ) acquires FuseBlockInfos {
+   ) acquires FuseBlockInfos, NextTokenId {
       let token_id = get_next_token_id();
       let token_name = concat(string::utf8(b"Token #"), token_id);
 
@@ -99,21 +99,25 @@ module item::item_nft {
       next_token_id.id = next_id;
    }
 
-   public entry fun get_aura_amount(token_id: u256): u256 {
+   public fun get_aura_amount(token_id: u256): Option<u256> acquires FuseBlockInfos {
       let fuse_block_infos = borrow_global_mut<FuseBlockInfos>(@item);
-      let found_fuse_block:FuseBlockInfo = FuseBlockInfo();
-      vector::for_each(&fuse_block_infos.infos, |v| {
+      let found_index = false;
+      let index = 0;
+      vector::enumerate_ref(&fuse_block_infos.infos, |i, v| {
          let v: &FuseBlockInfo = v;
          
-         if ( v.fuse_nft_id == token_id)
-            found_fuse_block = v;
+         if ( v.fuse_nft_id == token_id) {
+            found_index = true;
+            index = i;
+         };
       });
 
-      if (found_fuse_block) {
-         return found_fuse_block.amount;
-      };
-
-      return 0
+      if (found_index) {
+        let amount_found = vector::borrow(&fuse_block_infos.infos, index).amount;
+        option::some<u256>(amount_found)
+      } else {
+        option::none<u256>()
+      }
    }
 
    /// This function handles creating the token, minting it to the specified `to` address,
@@ -199,7 +203,7 @@ module item::item_nft {
    //            //
 
    #[test_only]
-   use item_nft::transfer_example::{Self};
+   use item::item_nft::{Self};
 
    #[test_only]
    /// Helper function to initialize the test and create and return the three admin/owner accounts
@@ -212,7 +216,7 @@ module item::item_nft {
       // For this, we just need to call the initialization function by directly invoking it.
       // It would normally be automatically called upon publishing the module, but since this
       // is a unit test, we have to manually call it.
-      transfer_example::init_module(admin);
+      item_nft::init_module(admin);
    }
 
    #[test(admin = @admin, owner_1 = @0xA, owner_2 = @0xB)]
@@ -228,17 +232,17 @@ module item::item_nft {
       let owner_2_address = signer::address_of(owner_2);
 
       // Admin is now the owner of the collection, so let's mint a token to owner_1
-      let token_address = transfer_example::mint_to(admin, string::utf8(b"Token #1"), owner_1_address);
+      let token_address = item_nft::mint_to(admin, string::utf8(b"Token #1"), owner_1_address);
       let token_object = object::address_to_object<Token>(token_address);
 
       assert!(object::is_owner(token_object, owner_1_address), 0);
 
       // Now let's transfer the token to owner_2, without owner_2's permission.
-      transfer_example::transfer(admin, token_object, owner_2_address);
+      item_nft::transfer(admin, token_object, owner_2_address);
       assert!(object::is_owner(token_object, owner_2_address), 0);
 
       // Now let's transfer the token back to admin, without owner_2's permission.
-      transfer_example::transfer(admin, token_object, admin_address);
+      item_nft::transfer(admin, token_object, admin_address);
       assert!(object::is_owner(token_object, admin_address), 0);
    }
 
@@ -247,13 +251,13 @@ module item::item_nft {
    // PERMISSION_DENIED = 0x5; // turns into 0x50000 when emitted from error.move
    // ENOT_ADMIN = 0x0;
    // thus expected_failure = PERMISSION_DENIED + ENOT_ADMIN = 0x50000 + 0x0 = 0x50000
-   #[test(admin = @0xFA)]
+   #[test(admin = @0xabcdef)] // not @admin
    #[expected_failure(abort_code = 0x50000, location = Self)]
    /// Tests creating a token and transferring it to multiple owners
    fun test_not_admin_for_init(
       admin: &signer,
    ) {
-      transfer_example::init_module(admin);
+      item_nft::init_module(admin);
    }
 
    // Test to ensure that the only account that can call `transfer` is the module's admin
@@ -267,12 +271,12 @@ module item::item_nft {
       init_for_test(admin);
       let owner_1_address = signer::address_of(owner_1);
       let owner_2_address = signer::address_of(owner_2);
-      let token_address = transfer_example::mint_to(admin, string::utf8(b"Token #1"), owner_1_address);
+      let token_address = item_nft::mint_to(admin, string::utf8(b"Token #1"), owner_1_address);
       let token_object = object::address_to_object<Token>(token_address);
       assert!(object::is_owner(token_object, owner_1_address), 0);
 
       // owner_2 tries to transfer the token to themself, but fails because they are not the admin
-      transfer_example::transfer(owner_2, token_object, owner_2_address);
+      item_nft::transfer(owner_2, token_object, owner_2_address);
    }
 
 
