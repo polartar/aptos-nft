@@ -1,1 +1,1 @@
-aptos move test --named-addresses item=default,admin=default
+aptos move publish --named-addresses item=default,admin=default

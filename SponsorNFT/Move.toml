@@ -7,9 +7,6 @@ authors = []
 admin = "_"
 item = '_'
 
-[dev-addresses]
-admin = "0xfa"
-item = "0xfb"
 
 [dependencies.AptosFramework]
 git = 'https://github.com/aptos-labs/aptos-core.git'
