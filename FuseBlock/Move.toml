@@ -1,11 +1,11 @@
 [package]
-name = 'item_nft'
+name = 'fuse_block'
 version = '1.0.0'
 authors = []
 
 [addresses]
 admin = "_"
-item = '_'
+admin_addr = '_'
 
 
 [dependencies.AptosFramework]
