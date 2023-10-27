@@ -6,8 +6,11 @@ module admin_addr::item {
    use std::string::{Self, String};
    use std::object::{Self, Object, TransferRef};
    use aptos_token_objects::royalty::{Royalty};
-   use aptos_token_objects::token::{Self, Token};
+   use aptos_token_objects::token::{Self, Token, create_named_token, create_token_seed};
    use aptos_token_objects::collection;
+   use aptos_framework::fungible_asset::Metadata;
+   // use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
+   use admin_addr::managed_fungible_asset;
 
    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
    struct NextTokenId has key {
@@ -19,14 +22,15 @@ module admin_addr::item {
       transfer_ref: TransferRef,
    }
 
-   struct FuseBlockInfo has store, key  {
-      amount: u256,
-      fuse_nft_id: u256
+   struct ItemInfo has store,copy, key  {
+      amount: u64,
+      item_nft_id: u256,
+      uuid: String
    }
 
    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-   struct FuseBlockInfos has store, key  {
-      infos: vector<FuseBlockInfo>
+   struct ItemInfos has store, key  {
+      infos: vector<ItemInfo>
    }
 
    /// The account that calls this function must be the module's designated admin, as set in the `Move.toml` file.
@@ -37,6 +41,9 @@ module admin_addr::item {
    const COLLECTION_DESCRIPTION: vector<u8> = b"A collection of infused items";
    const COLLECTION_URI: vector<u8> = b"collection image uri";
    const TOKEN_URI: vector<u8> = b"token image uri";
+
+   const ASSET_SYMBOL: vector<u8> = b"Item NFT";
+   const TOKEN_NAME: vector<u8> = b"item token";
 
    /// Ensure that the deployer is the @admin of the module, then create the collection.
    /// Note that `init_module` is automatically run when the contract is published.
@@ -53,7 +60,7 @@ module admin_addr::item {
    }
 
    fun publish_item_infos(account: &signer) {
-      move_to(account, FuseBlockInfos {
+      move_to(account, ItemInfos {
          infos: vector::empty() 
       });
    }
@@ -64,22 +71,25 @@ module admin_addr::item {
        s
    }
 
-   public entry fun mint(
+   public entry fun mint_direct(
       admin: &signer,
       to: address,
-      aura_amount: u256
-   ) acquires FuseBlockInfos, NextTokenId {
+      uuid: String,
+      aura_amount: u64
+   ) acquires ItemInfos, NextTokenId {
       let token_id = get_next_token_id();
       let token_name = concat(string::utf8(b"Token #"), token_id);
 
       mint_to(admin, token_name, to);
+      managed_fungible_asset::mint_to_primary_stores(admin, get_metadata(), vector[to], vector[aura_amount]);
       
-      let new_item = FuseBlockInfo {
+      let new_item = ItemInfo {
          amount: aura_amount,
-         fuse_nft_id: token_id,
+         item_nft_id: token_id,
+         uuid: uuid
       };
 
-      let item_infos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
+      let item_infos = borrow_global_mut<ItemInfos>(@admin_addr);
       vector::push_back(&mut item_infos.infos, new_item);
 
       store_next_token_id(token_id + 1);
@@ -94,24 +104,24 @@ module admin_addr::item {
       next_token_id.id = next_id;
    }
 
-   public fun get_aura_amount(token_id: u256): Option<u256> acquires FuseBlockInfos {
-      let item_infos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
+   public fun get_aura_amount(token_id: u256): Option<ItemInfo> acquires ItemInfos {
+      let item_infos = borrow_global_mut<ItemInfos>(@admin_addr);
       let found_index = false;
       let index = 0;
       vector::enumerate_ref(&item_infos.infos, |i, v| {
-         let v: &FuseBlockInfo = v;
+         let v: &ItemInfo = v;
          
-         if ( v.fuse_nft_id == token_id) {
+         if ( v.item_nft_id == token_id) {
             found_index = true;
             index = i;
          };
       });
 
       if (found_index) {
-        let amount_found = vector::borrow(&item_infos.infos, index).amount;
-        option::some<u256>(amount_found)
+        let item = vector::borrow(&item_infos.infos, index);
+        option::some<ItemInfo>(*item)
       } else {
-        option::none<u256>()
+        option::none<ItemInfo>()
       }
    }
 
@@ -190,7 +200,39 @@ module admin_addr::item {
          option::none<Royalty>(),
          string::utf8(COLLECTION_URI),
       );
+      
+      let constructor_ref = &create_named_token(admin,
+            string::utf8(COLLECTION_NAME),
+            string::utf8(COLLECTION_DESCRIPTION),
+            string::utf8(TOKEN_NAME),
+            option::none(),
+            string::utf8(b"http://aptoslabs.com/token"),
+        );
+
+      managed_fungible_asset::initialize(
+         constructor_ref,
+         0, /* maximum_supply. 0 means no maximum */
+         string::utf8(b"item amount"), /* name */
+         string::utf8(ASSET_SYMBOL), /* symbol */
+         0, /* decimals */
+         string::utf8(b"http://example.com/favicon.ico"), /* icon */
+         string::utf8(b"http://example.com"), /* project */
+         vector[true, true, true], /* mint_ref, transfer_ref, burn_ref */
+      );
    }
+
+   #[view]
+    /// Return the address of the managed fungible asset that's created when this module is deployed.
+    /// This function is optional as a helper function for offline applications.
+    public fun get_metadata(): Object<Metadata> {
+        let collection_name: String = string::utf8(COLLECTION_NAME);
+        let token_name: String = string::utf8(TOKEN_NAME);
+        let asset_address = object::create_object_address(
+            &@admin_addr,
+            create_token_seed(&collection_name, &token_name)
+        );
+        object::address_to_object<Metadata>(asset_address)
+    }
 
    //            //
    // Unit tests //
