@@ -37,13 +37,14 @@ module admin_addr::item {
    const ENOT_ADMIN: u64 = 0;
 
    // Collection configuration details
-   const COLLECTION_NAME: vector<u8> = b"Infuse Items";
+   const COLLECTION_NAME: vector<u8> = b"Infused Items";
    const COLLECTION_DESCRIPTION: vector<u8> = b"A collection of infused items";
    const COLLECTION_URI: vector<u8> = b"collection image uri";
-   const TOKEN_URI: vector<u8> = b"token image uri";
+   const TOKEN_URI: vector<u8> = b"https://picsum.photos/200/300?id=";
+   const TOKEN_IDENTIFIER: vector<u8> = b"Infuse Item #";
 
    const ASSET_SYMBOL: vector<u8> = b"Item NFT";
-   const TOKEN_NAME: vector<u8> = b"item token";
+   const TOKEN_NAME: vector<u8> = b"Item token";
 
    /// Ensure that the deployer is the @admin of the module, then create the collection.
    /// Note that `init_module` is automatically run when the contract is published.
@@ -71,6 +72,10 @@ module admin_addr::item {
        s
    }
 
+   public entry fun get_token_uri(token_id: u256) {
+      
+   }
+
    public entry fun mint_direct(
       admin: &signer,
       to: address,
@@ -78,9 +83,8 @@ module admin_addr::item {
       aura_amount: u64
    ) acquires ItemInfos, NextTokenId {
       let token_id = get_next_token_id();
-      let token_name = concat(string::utf8(b"Token #"), token_id);
-
-      mint_to(admin, token_name, to);
+      
+      mint_to(admin, token_id, to);
       managed_fungible_asset::mint_to_primary_stores(admin, get_metadata(), vector[to], vector[aura_amount]);
       
       let new_item = ItemInfo {
@@ -104,7 +108,7 @@ module admin_addr::item {
       next_token_id.id = next_id;
    }
 
-   public fun get_aura_amount(token_id: u256): Option<ItemInfo> acquires ItemInfos {
+   public fun get_item_info(token_id: u256): Option<ItemInfo> acquires ItemInfos {
       let item_infos = borrow_global_mut<ItemInfos>(@admin_addr);
       let found_index = false;
       let index = 0;
@@ -133,9 +137,13 @@ module admin_addr::item {
    /// @returns the address of the newly created Token Object
    public fun mint_to(
       admin: &signer,
-      token_name: String,
+      token_id: u256,
       to: address,
    ): address {
+      // Need to replace token_id to firebaseId
+      let token_uri = concat(string::utf8(TOKEN_URI), token_id);
+      let token_name = concat(string::utf8(TOKEN_IDENTIFIER), token_id);
+
       // create the token and get back the &ConstructorRef to create the other Refs with
       let token_constructor_ref = token::create_named_token(
          admin,
@@ -143,7 +151,7 @@ module admin_addr::item {
          string::utf8(COLLECTION_DESCRIPTION),
          token_name,
          option::none(),
-         string::utf8(TOKEN_URI),
+         string::utf8(token_uri),
       );
 
       // create the TransferRef, the token's `&signer`, and the token's `&Object`

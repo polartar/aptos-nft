@@ -19,9 +19,10 @@ module admin_addr::fuse_block {
       transfer_ref: TransferRef,
    }
 
-   struct FuseBlockInfo has store, key  {
+   struct FuseBlockInfo has store, key, copy  {
       amount: u256,
-      fuse_nft_id: u256
+      fuse_nft_id: u256,
+      meet_requirement: bool
    }
 
    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -31,6 +32,7 @@ module admin_addr::fuse_block {
 
    /// The account that calls this function must be the module's designated admin, as set in the `Move.toml` file.
    const ENOT_ADMIN: u64 = 0;
+   const ENOT_MEET_REQUREMENT:u64 = 10;
 
    // Collection configuration details
    const COLLECTION_NAME: vector<u8> = b"Fuse Block";
@@ -77,6 +79,7 @@ module admin_addr::fuse_block {
       let new_fuse_block = FuseBlockInfo {
          amount: aura_amount,
          fuse_nft_id: token_id,
+         meet_requirement: false
       };
 
       let fuse_block_infos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
@@ -89,16 +92,11 @@ module admin_addr::fuse_block {
       borrow_global<NextTokenId>(@admin_addr).id
    }
 
-   fun store_next_token_id(next_id: u256) acquires NextTokenId {
-      let next_token_id = borrow_global_mut<NextTokenId>(@admin_addr);
-      next_token_id.id = next_id;
-   }
-
-   public fun get_aura_amount(token_id: u256): Option<u256> acquires FuseBlockInfos {
-      let fuse_block_infos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
+   fun get_fuseblock_index(token_id: u256): Option<u64> acquires FuseBlockInfos {
+      let fuse_blockinfos = borrow_global<FuseBlockInfos>(@admin_addr);
       let found_index = false;
       let index = 0;
-      vector::enumerate_ref(&fuse_block_infos.infos, |i, v| {
+      vector::enumerate_ref(&fuse_blockinfos.infos, |i, v| {
          let v: &FuseBlockInfo = v;
          
          if ( v.fuse_nft_id == token_id) {
@@ -106,13 +104,63 @@ module admin_addr::fuse_block {
             index = i;
          };
       });
-
       if (found_index) {
-        let amount_found = vector::borrow(&fuse_block_infos.infos, index).amount;
-        option::some<u256>(amount_found)
+         option::some<u64>(index)
       } else {
-        option::none<u256>()
+         option::none<u64>()
       }
+   }
+
+   public entry fun set_meet_requirement(
+      admin: &signer,
+      token_id: u256
+   ) acquires FuseBlockInfos {
+      assert!(signer::address_of(admin) == @admin_addr, error::permission_denied(ENOT_ADMIN)); 
+      
+      let idx = get_fuseblock_index(token_id);
+      if (option::is_some<u64>(&idx)) {
+         let fuse_blockinfos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
+         let fuse_block = vector::borrow_mut(&mut fuse_blockinfos.infos, option::extract(&mut idx));
+         fuse_block.meet_requirement = true;
+      };
+   }
+
+
+   fun store_next_token_id(next_id: u256) acquires NextTokenId {
+      let next_token_id = borrow_global_mut<NextTokenId>(@admin_addr);
+      next_token_id.id = next_id;
+   }
+
+   public entry fun get_aura_amount(token_id: u256): Option<u256> acquires FuseBlockInfos {
+      let fuse_block_infos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
+
+      let idx = get_fuseblock_index(token_id);
+      if (option::is_some<u64>(&idx)) {
+         let amount_found = vector::borrow(&fuse_block_infos.infos, option::extract(&mut idx)).amount;
+         option::some<u256>(amount_found)
+      } else {
+         option::none<u256>()
+      }
+      
+
+      // let fuse_block_infos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
+      // let found_index = false;
+      // let index = 0;
+      // vector::enumerate_ref(&fuse_block_infos.infos, |i, v| {
+      //    let v: &FuseBlockInfo = v;
+         
+      //    if ( v.fuse_nft_id == token_id) {
+      //       found_index = true;
+      //       index = i;
+      //    };
+      // });
+
+      // if (found_index) {
+      //   let amount_found = vector::borrow(&fuse_block_infos.infos, index).amount;
+      //   option::some<u256>(amount_found)
+      // } else {
+      //   option::none<u256>()
+      // }
    }
 
    /// This function handles creating the token, minting it to the specified `to` address,
@@ -158,28 +206,43 @@ module admin_addr::fuse_block {
       signer::address_of(&token_signer)
    }
 
-   //  /// This function requires elevated admin access, as it handles transferring the token
-   //  /// to the specified `to` address regardless of who owns it.
-   // public entry fun transfer(
-   //    admin: &signer,
-   //    token: Object<Token>,
-   //    to: address,
-   // ) acquires Refs {
-   //    // Ensure that the caller is the @admin of the module
-   //    assert!(signer::address_of(admin) == @admin_addr, error::permission_denied(ENOT_ADMIN));
+    /// This function requires elevated admin access, as it handles transferring the token
+    /// to the specified `to` address regardless of who owns it.
+   public entry fun transfer(
+      admin: &signer,
+      token: Object<Token>,
+      to: address,
+   ) acquires Refs, FuseBlockInfos {
+      // Ensure that the caller is the @admin of the module
+      assert!(signer::address_of(admin) == @admin_addr, error::permission_denied(ENOT_ADMIN));
 
-   //    // In order to call `object::transfer_with_ref`, we must possess a `LinearTransferRef`,
-   //    // which gives us the right to a one-time unilateral transfer, regardless of the Object's owner.
+      // // In order to call `object::transfer_with_ref`, we must possess a `LinearTransferRef`,
+      // // which gives us the right to a one-time unilateral transfer, regardless of the Object's owner.
 
-   //    // 1. First, we must borrow the `Refs` resource at the token's address, which contains the `TransferRef`
-   //    let refs = borrow_global<Refs>(object::object_address(&token));
+      // // 1. First, we must borrow the `Refs` resource at the token's address, which contains the `TransferRef`
+      // let refs = borrow_global<Refs>(object::object_address(&token));
 
-   //    // 2. Generate the linear transfer ref with a reference to the Token's `Ref.transfer_ref: TransferRef`
-   //    let linear_transfer_ref = object::generate_linear_transfer_ref(&refs.transfer_ref);
+      // // 2. Generate the linear transfer ref with a reference to the Token's `Ref.transfer_ref: TransferRef`
+      // let linear_transfer_ref = object::generate_linear_transfer_ref(&refs.transfer_ref);
 
-   //    // 3. Transfer the token to the receiving `to` account
-   //    object::transfer_with_ref(linear_transfer_ref, to);
-   // }
+      // // 3. Transfer the token to the receiving `to` account
+      // object::transfer_with_ref(linear_transfer_ref, to);
+
+      // let token = borrow_global_mut<Token>(@);
+      let token_id = token::Token::id(&token);
+
+      let fuse_block_infos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
+
+      let idx = get_fuseblock_index(token_id);
+      let meet_requirement = false;
+      if (option::is_some<u64>(&idx)) {
+         let meet_requirement = vector::borrow(&fuse_block_infos.infos, option::extract(&mut idx)).meet_requirement;
+      };
+      
+      let fuse_block = get_fuseblock_info(token_id);
+      assert!(meet_requirement == true, error::permission_denied(ENOT_MEET_REQUREMENT));
+      object::transfer(admin, token, to);
+   }
 
    /// Helper function to create the collection
    public fun create_collection(admin: &signer) {
