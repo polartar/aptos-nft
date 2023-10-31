@@ -141,26 +141,6 @@ module admin_addr::fuse_block {
       } else {
          option::none<u256>()
       }
-      
-
-      // let fuse_block_infos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
-      // let found_index = false;
-      // let index = 0;
-      // vector::enumerate_ref(&fuse_block_infos.infos, |i, v| {
-      //    let v: &FuseBlockInfo = v;
-         
-      //    if ( v.fuse_nft_id == token_id) {
-      //       found_index = true;
-      //       index = i;
-      //    };
-      // });
-
-      // if (found_index) {
-      //   let amount_found = vector::borrow(&fuse_block_infos.infos, index).amount;
-      //   option::some<u256>(amount_found)
-      // } else {
-      //   option::none<u256>()
-      // }
    }
 
    /// This function handles creating the token, minting it to the specified `to` address,
@@ -216,19 +196,6 @@ module admin_addr::fuse_block {
       // Ensure that the caller is the @admin of the module
       assert!(signer::address_of(admin) == @admin_addr, error::permission_denied(ENOT_ADMIN));
 
-      // // In order to call `object::transfer_with_ref`, we must possess a `LinearTransferRef`,
-      // // which gives us the right to a one-time unilateral transfer, regardless of the Object's owner.
-
-      // // 1. First, we must borrow the `Refs` resource at the token's address, which contains the `TransferRef`
-      // let refs = borrow_global<Refs>(object::object_address(&token));
-
-      // // 2. Generate the linear transfer ref with a reference to the Token's `Ref.transfer_ref: TransferRef`
-      // let linear_transfer_ref = object::generate_linear_transfer_ref(&refs.transfer_ref);
-
-      // // 3. Transfer the token to the receiving `to` account
-      // object::transfer_with_ref(linear_transfer_ref, to);
-
-      // let token = borrow_global_mut<Token>(@);
       let token_id = token::Token::id(&token);
 
       let fuse_block_infos = borrow_global_mut<FuseBlockInfos>(@admin_addr);
