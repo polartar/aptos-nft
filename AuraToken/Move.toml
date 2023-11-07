@@ -6,8 +6,9 @@ authors = []
 [addresses]
 admin_addr = "_"
 
-
 [dev-addresses]
+admin_addr = "0xbeefcafe"
+
 [dependencies.AptosFramework]
 git = 'https://github.com/aptos-labs/aptos-core.git'
 rev = 'mainnet'
