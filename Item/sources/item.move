@@ -1,4 +1,4 @@
-module admin_addr::item_nft {
+module admin_addr::item {
    use std::signer;
    use std::option::{Self};
    use std::error;
@@ -152,7 +152,7 @@ module admin_addr::item_nft {
       from: address,
       to: address,
       amount: u64
-   ) acquires Refs {
+   )  {
       // Ensure that the caller is the @admin of the module
       assert!(signer::address_of(admin) == @admin, error::permission_denied(ENOT_ADMIN));
 
