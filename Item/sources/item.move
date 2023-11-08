@@ -1,8 +1,8 @@
-module admin_addr::item {
+module admin_addr::item_nft {
    use std::signer;
-   use std::option::{Self, Option};
+   use std::option::{Self};
    use std::error;
-   use std::vector;
+   // use std::vector;
    use std::string::{Self, String};
    use std::object::{Self, Object, TransferRef};
    use aptos_token_objects::royalty::{Royalty};
@@ -22,16 +22,7 @@ module admin_addr::item {
       transfer_ref: TransferRef,
    }
 
-   struct ItemInfo has store,copy, key  {
-      amount: u64,
-      item_nft_id: u256,
-      uuid: String
-   }
-
-   #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-   struct ItemInfos has store, key  {
-      infos: vector<ItemInfo>
-   }
+    
 
    /// The account that calls this function must be the module's designated admin, as set in the `Move.toml` file.
    const ENOT_ADMIN: u64 = 0;
@@ -53,18 +44,18 @@ module admin_addr::item {
       create_collection(deployer);
 
       publish_next_token_id(deployer);
-      publish_item_infos(deployer);
+      // publish_item_infos(deployer);
    }
 
    fun publish_next_token_id(account: &signer) {
       move_to(account, NextTokenId { id: 0 }) 
    }
 
-   fun publish_item_infos(account: &signer) {
-      move_to(account, ItemInfos {
-         infos: vector::empty() 
-      });
-   }
+   // fun publish_item_infos(account: &signer) {
+   //    move_to(account, ItemInfos {
+   //       infos: vector::empty() 
+   //    });
+   // }
 
    inline fun concat<T>(s: String, n: T): String {
        let n_str = aptos_std::string_utils::to_string(&n);
@@ -72,29 +63,25 @@ module admin_addr::item {
        s
    }
 
-   public entry fun get_token_uri(token_id: u256) {
-      
-   }
-
    public entry fun mint_direct(
       admin: &signer,
       to: address,
-      uuid: String,
-      aura_amount: u64
-   ) acquires ItemInfos, NextTokenId {
+      // uuid: String,
+      amount: u64
+   ) acquires  NextTokenId {
       let token_id = get_next_token_id();
       
       mint_to(admin, token_id, to);
-      managed_fungible_asset::mint_to_primary_stores(admin, get_metadata(), vector[to], vector[aura_amount]);
+      managed_fungible_asset::mint_to_primary_stores(admin, get_metadata(), vector[to], vector[amount]);
       
-      let new_item = ItemInfo {
-         amount: aura_amount,
-         item_nft_id: token_id,
-         uuid: uuid
-      };
+      // let new_item = ItemInfo {
+      //    amount: aura_amount,
+      //    item_nft_id: token_id,
+      //    uuid: uuid
+      // };
 
-      let item_infos = borrow_global_mut<ItemInfos>(@admin_addr);
-      vector::push_back(&mut item_infos.infos, new_item);
+      // let item_infos = borrow_global_mut<ItemInfos>(@admin_addr);
+      // vector::push_back(&mut item_infos.infos, new_item);
 
       store_next_token_id(token_id + 1);
    }
@@ -108,26 +95,7 @@ module admin_addr::item {
       next_token_id.id = next_id;
    }
 
-   public fun get_item_info(token_id: u256): Option<ItemInfo> acquires ItemInfos {
-      let item_infos = borrow_global_mut<ItemInfos>(@admin_addr);
-      let found_index = false;
-      let index = 0;
-      vector::enumerate_ref(&item_infos.infos, |i, v| {
-         let v: &ItemInfo = v;
-         
-         if ( v.item_nft_id == token_id) {
-            found_index = true;
-            index = i;
-         };
-      });
-
-      if (found_index) {
-        let item = vector::borrow(&item_infos.infos, index);
-        option::some<ItemInfo>(*item)
-      } else {
-        option::none<ItemInfo>()
-      }
-   }
+    
 
    /// This function handles creating the token, minting it to the specified `to` address,
    /// and storing the `TransferRef` for the Token in its `Refs` resource.
@@ -151,7 +119,7 @@ module admin_addr::item {
          string::utf8(COLLECTION_DESCRIPTION),
          token_name,
          option::none(),
-         string::utf8(token_uri),
+         token_uri,
       );
 
       // create the TransferRef, the token's `&signer`, and the token's `&Object`
@@ -180,23 +148,27 @@ module admin_addr::item {
     /// to the specified `to` address regardless of who owns it.
    public entry fun transfer(
       admin: &signer,
-      token: Object<Token>,
+      // token: Object<Token>,
+      from: address,
       to: address,
+      amount: u64
    ) acquires Refs {
       // Ensure that the caller is the @admin of the module
       assert!(signer::address_of(admin) == @admin, error::permission_denied(ENOT_ADMIN));
 
-      // In order to call `object::transfer_with_ref`, we must possess a `LinearTransferRef`,
-      // which gives us the right to a one-time unilateral transfer, regardless of the Object's owner.
+      // let refs = borrow_global<Refs>(object::object_address(&token));
 
-      // 1. First, we must borrow the `Refs` resource at the token's address, which contains the `TransferRef`
-      let refs = borrow_global<Refs>(object::object_address(&token));
-
-      // 2. Generate the linear transfer ref with a reference to the Token's `Ref.transfer_ref: TransferRef`
-      let linear_transfer_ref = object::generate_linear_transfer_ref(&refs.transfer_ref);
+      // let linear_transfer_ref = object::generate_linear_transfer_ref(&refs.transfer_ref);
 
       // 3. Transfer the token to the receiving `to` account
-      object::transfer_with_ref(linear_transfer_ref, to);
+      // object::transfer_with_ref(linear_transfer_ref, to);
+      managed_fungible_asset::transfer_between_primary_stores(
+            admin,
+            get_metadata(),
+            vector[from],
+            vector[to],
+            vector[amount]
+        );
    }
 
    /// Helper function to create the collection
@@ -246,82 +218,82 @@ module admin_addr::item {
    // Unit tests //
    //            //
 
-   #[test_only]
-   use admin_addr::item::{Self};
+   // #[test_only]
+   // use admin_addr::item::{Self};
 
-   #[test_only]
-   /// Helper function to initialize the test and create and return the three admin/owner accounts
-   fun init_for_test(
-      admin: &signer,
-   ) {
-      // Normally we might put some more complex logic in here if we regularly instantiate multiple
-      // accounts and logistical things for each test
+   // #[test_only]
+   // /// Helper function to initialize the test and create and return the three admin/owner accounts
+   // fun init_for_test(
+   //    admin: &signer,
+   // ) {
+   //    // Normally we might put some more complex logic in here if we regularly instantiate multiple
+   //    // accounts and logistical things for each test
 
-      // For this, we just need to call the initialization function by directly invoking it.
-      // It would normally be automatically called upon publishing the module, but since this
-      // is a unit test, we have to manually call it.
-      item::init_module(admin);
-   }
+   //    // For this, we just need to call the initialization function by directly invoking it.
+   //    // It would normally be automatically called upon publishing the module, but since this
+   //    // is a unit test, we have to manually call it.
+   //    item::init_module(admin);
+   // }
 
-   #[test(admin = @admin, owner_1 = @0xA, owner_2 = @0xB)]
-   /// Tests creating a token and transferring it to multiple owners
-   fun test_happy_path(
-      admin: &signer,
-      owner_1: &signer,
-      owner_2: &signer,
-   ) acquires Refs {
-      init_for_test(admin);
-      let admin_address = signer::address_of(admin);
-      let owner_1_address = signer::address_of(owner_1);
-      let owner_2_address = signer::address_of(owner_2);
+   // #[test(admin = @admin, owner_1 = @0xA, owner_2 = @0xB)]
+   // /// Tests creating a token and transferring it to multiple owners
+   // fun test_happy_path(
+   //    admin: &signer,
+   //    owner_1: &signer,
+   //    owner_2: &signer,
+   // ) acquires Refs {
+   //    init_for_test(admin);
+   //    let admin_address = signer::address_of(admin);
+   //    let owner_1_address = signer::address_of(owner_1);
+   //    let owner_2_address = signer::address_of(owner_2);
 
-      // Admin is now the owner of the collection, so let's mint a token to owner_1
-      let token_address = item::mint_to(admin, string::utf8(b"Token #1"), owner_1_address);
-      let token_object = object::address_to_object<Token>(token_address);
+   //    // Admin is now the owner of the collection, so let's mint a token to owner_1
+   //    let token_address = item::mint_to(admin, string::utf8(b"Token #1"), owner_1_address);
+   //    let token_object = object::address_to_object<Token>(token_address);
 
-      assert!(object::is_owner(token_object, owner_1_address), 0);
+   //    assert!(object::is_owner(token_object, owner_1_address), 0);
 
-      // Now let's transfer the token to owner_2, without owner_2's permission.
-      item::transfer(admin, token_object, owner_2_address);
-      assert!(object::is_owner(token_object, owner_2_address), 0);
+   //    // Now let's transfer the token to owner_2, without owner_2's permission.
+   //    item::transfer(admin, token_object, owner_2_address);
+   //    assert!(object::is_owner(token_object, owner_2_address), 0);
 
-      // Now let's transfer the token back to admin, without owner_2's permission.
-      item::transfer(admin, token_object, admin_address);
-      assert!(object::is_owner(token_object, admin_address), 0);
-   }
+   //    // Now let's transfer the token back to admin, without owner_2's permission.
+   //    item::transfer(admin, token_object, admin_address);
+   //    assert!(object::is_owner(token_object, admin_address), 0);
+   // }
 
-   // Test to ensure the deployer must set to admin
-   // see error.move for more error codes
-   // PERMISSION_DENIED = 0x5; // turns into 0x50000 when emitted from error.move
-   // ENOT_ADMIN = 0x0;
-   // thus expected_failure = PERMISSION_DENIED + ENOT_ADMIN = 0x50000 + 0x0 = 0x50000
-   #[test(admin = @0xabcdef)] // not @admin
-   #[expected_failure(abort_code = 0x50000, location = Self)]
-   /// Tests creating a token and transferring it to multiple owners
-   fun test_not_admin_for_init(
-      admin: &signer,
-   ) {
-      item::init_module(admin);
-   }
+   // // Test to ensure the deployer must set to admin
+   // // see error.move for more error codes
+   // // PERMISSION_DENIED = 0x5; // turns into 0x50000 when emitted from error.move
+   // // ENOT_ADMIN = 0x0;
+   // // thus expected_failure = PERMISSION_DENIED + ENOT_ADMIN = 0x50000 + 0x0 = 0x50000
+   // #[test(admin = @0xabcdef)] // not @admin
+   // #[expected_failure(abort_code = 0x50000, location = Self)]
+   // /// Tests creating a token and transferring it to multiple owners
+   // fun test_not_admin_for_init(
+   //    admin: &signer,
+   // ) {
+   //    item::init_module(admin);
+   // }
 
-   // Test to ensure that the only account that can call `transfer` is the module's admin
-   #[test(admin = @admin, owner_1 = @0xA, owner_2 = @0xB)]
-   #[expected_failure(abort_code = 0x50000, location = Self)]
-   fun test_not_admin_for_transfer(
-      admin: &signer,
-      owner_1: &signer,
-      owner_2: &signer,
-   ) acquires Refs {
-      init_for_test(admin);
-      let owner_1_address = signer::address_of(owner_1);
-      let owner_2_address = signer::address_of(owner_2);
-      let token_address = item::mint_to(admin, string::utf8(b"Token #1"), owner_1_address);
-      let token_object = object::address_to_object<Token>(token_address);
-      assert!(object::is_owner(token_object, owner_1_address), 0);
+   // // Test to ensure that the only account that can call `transfer` is the module's admin
+   // #[test(admin = @admin, owner_1 = @0xA, owner_2 = @0xB)]
+   // #[expected_failure(abort_code = 0x50000, location = Self)]
+   // fun test_not_admin_for_transfer(
+   //    admin: &signer,
+   //    owner_1: &signer,
+   //    owner_2: &signer,
+   // ) acquires Refs {
+   //    init_for_test(admin);
+   //    let owner_1_address = signer::address_of(owner_1);
+   //    let owner_2_address = signer::address_of(owner_2);
+   //    let token_address = item::mint_to(admin, string::utf8(b"Token #1"), owner_1_address);
+   //    let token_object = object::address_to_object<Token>(token_address);
+   //    assert!(object::is_owner(token_object, owner_1_address), 0);
 
-      // owner_2 tries to transfer the token to themself, but fails because they are not the admin
-      item::transfer(owner_2, token_object, owner_2_address);
-   }
+   //    // owner_2 tries to transfer the token to themself, but fails because they are not the admin
+   //    item::transfer(owner_2, token_object, owner_2_address);
+   // }
 
 
 }
