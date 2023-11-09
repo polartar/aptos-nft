@@ -28,14 +28,14 @@ module admin_addr::item {
    const ENOT_ADMIN: u64 = 0;
 
    // Collection configuration details
-   const COLLECTION_NAME: vector<u8> = b"Infused Items";
-   const COLLECTION_DESCRIPTION: vector<u8> = b"A collection of infused items";
-   const COLLECTION_URI: vector<u8> = b"collection image uri";
-   const TOKEN_URI: vector<u8> = b"https://picsum.photos/200/300?id=";
+   const COLLECTION_NAME: vector<u8> = b"Items";
+   const COLLECTION_DESCRIPTION: vector<u8> = b"A collection of items";
+   const COLLECTION_URI: vector<u8> = b"https://fastly.picsum.photos/id/568/200/300.jpg?hmac=vQmkZRQt1uS-LMo2VtIQ7fn08mmx8Fz3Yy3lql5wkzM";
+   const TOKEN_URI: vector<u8> = b"https://fastly.picsum.photos/id/838/200/300.jpg?hmac=yns6FqTn8FmJq3qluHDmnjn6X4x-rC4lGjZVUIMknuI";
    const TOKEN_IDENTIFIER: vector<u8> = b"Infuse Item #";
 
    const ASSET_SYMBOL: vector<u8> = b"Item NFT";
-   const TOKEN_NAME: vector<u8> = b"Item token";
+   // const TOKEN_NAME: vector<u8> = b"Item token";
 
    /// Ensure that the deployer is the @admin of the module, then create the collection.
    /// Note that `init_module` is automatically run when the contract is published.
@@ -51,39 +51,31 @@ module admin_addr::item {
       move_to(account, NextTokenId { id: 0 }) 
    }
 
-   // fun publish_item_infos(account: &signer) {
-   //    move_to(account, ItemInfos {
-   //       infos: vector::empty() 
-   //    });
-   // }
-
    inline fun concat<T>(s: String, n: T): String {
        let n_str = aptos_std::string_utils::to_string(&n);
        string::append(&mut s, n_str);
        s
    }
 
-   public entry fun mint_direct(
+   public entry fun mint(
       admin: &signer,
-      to: address,
-      // uuid: String,
       amount: u64
    ) acquires  NextTokenId {
       let token_id = get_next_token_id();
       
-      mint_to(admin, token_id, to);
-      managed_fungible_asset::mint_to_primary_stores(admin, get_metadata(), vector[to], vector[amount]);
+      mint_to(admin, token_id, amount);
       
-      // let new_item = ItemInfo {
-      //    amount: aura_amount,
-      //    item_nft_id: token_id,
-      //    uuid: uuid
-      // };
-
-      // let item_infos = borrow_global_mut<ItemInfos>(@admin_addr);
-      // vector::push_back(&mut item_infos.infos, new_item);
-
       store_next_token_id(token_id + 1);
+   }
+
+   public entry fun mint_with_token(
+      admin: &signer,
+      token_address: address,
+      amount: u64
+   ) {      
+      let to = signer::address_of(admin);
+      let metadata = object::address_to_object<Metadata>(token_address);
+      managed_fungible_asset::mint_to_primary_stores(admin, metadata, vector[to], vector[amount]);
    }
 
    fun get_next_token_id(): u256 acquires NextTokenId {
@@ -95,21 +87,13 @@ module admin_addr::item {
       next_token_id.id = next_id;
    }
 
-    
-
-   /// This function handles creating the token, minting it to the specified `to` address,
-   /// and storing the `TransferRef` for the Token in its `Refs` resource.
-   /// This means every time we create a new Token, we create and move a Refs resource
-   /// to its global address. This is how we can keep track of the TransferRef for each
-   /// individual Token we create.
-   /// @returns the address of the newly created Token Object
    public fun mint_to(
       admin: &signer,
       token_id: u256,
-      to: address,
+      amount: u64
    ): address {
-      // Need to replace token_id to firebaseId
-      let token_uri = concat(string::utf8(TOKEN_URI), token_id);
+      let to = signer::address_of(admin);
+      // let token_uri = concat(string::utf8(TOKEN_URI), token_id);
       let token_name = concat(string::utf8(TOKEN_IDENTIFIER), token_id);
 
       // create the token and get back the &ConstructorRef to create the other Refs with
@@ -119,7 +103,7 @@ module admin_addr::item {
          string::utf8(COLLECTION_DESCRIPTION),
          token_name,
          option::none(),
-         token_uri,
+         string::utf8(TOKEN_URI),
       );
 
       // create the TransferRef, the token's `&signer`, and the token's `&Object`
@@ -141,6 +125,19 @@ module admin_addr::item {
          refs,
       );
 
+      managed_fungible_asset::initialize(
+         &token_constructor_ref,
+         0, /* maximum_supply. 0 means no maximum */
+         string::utf8(b"item amount"), /* name */
+         string::utf8(ASSET_SYMBOL), /* symbol */
+         0, /* decimals */
+         string::utf8(b"http://example.com/favicon.ico"), /* icon */
+         string::utf8(b"http://example.com"), /* project */
+         vector[true, true, true], /* mint_ref, transfer_ref, burn_ref */
+      );
+
+      managed_fungible_asset::mint_to_primary_stores(admin, get_metadata(token_id), vector[to], vector[amount]);
+
       signer::address_of(&token_signer)
    }
 
@@ -148,24 +145,18 @@ module admin_addr::item {
     /// to the specified `to` address regardless of who owns it.
    public entry fun transfer(
       admin: &signer,
-      // token: Object<Token>,
-      from: address,
+      token_address: address,
       to: address,
       amount: u64
    )  {
       // Ensure that the caller is the @admin of the module
       assert!(signer::address_of(admin) == @admin, error::permission_denied(ENOT_ADMIN));
-
-      // let refs = borrow_global<Refs>(object::object_address(&token));
-
-      // let linear_transfer_ref = object::generate_linear_transfer_ref(&refs.transfer_ref);
-
-      // 3. Transfer the token to the receiving `to` account
-      // object::transfer_with_ref(linear_transfer_ref, to);
+      let metadata = object::address_to_object<Metadata>(token_address);
       managed_fungible_asset::transfer_between_primary_stores(
             admin,
-            get_metadata(),
-            vector[from],
+            // get_metadata(),
+            metadata,
+            vector[signer::address_of(admin)],
             vector[to],
             vector[amount]
         );
@@ -180,33 +171,15 @@ module admin_addr::item {
          option::none<Royalty>(),
          string::utf8(COLLECTION_URI),
       );
-      
-      let constructor_ref = &create_named_token(admin,
-            string::utf8(COLLECTION_NAME),
-            string::utf8(COLLECTION_DESCRIPTION),
-            string::utf8(TOKEN_NAME),
-            option::none(),
-            string::utf8(b"http://aptoslabs.com/token"),
-        );
-
-      managed_fungible_asset::initialize(
-         constructor_ref,
-         0, /* maximum_supply. 0 means no maximum */
-         string::utf8(b"item amount"), /* name */
-         string::utf8(ASSET_SYMBOL), /* symbol */
-         0, /* decimals */
-         string::utf8(b"http://example.com/favicon.ico"), /* icon */
-         string::utf8(b"http://example.com"), /* project */
-         vector[true, true, true], /* mint_ref, transfer_ref, burn_ref */
-      );
    }
 
    #[view]
     /// Return the address of the managed fungible asset that's created when this module is deployed.
     /// This function is optional as a helper function for offline applications.
-    public fun get_metadata(): Object<Metadata> {
+    public fun get_metadata(token_id: u256): Object<Metadata> {
         let collection_name: String = string::utf8(COLLECTION_NAME);
-        let token_name: String = string::utf8(TOKEN_NAME);
+      //   let token_name: String = string::utf8(TOKEN_NAME);
+        let token_name = concat(string::utf8(TOKEN_IDENTIFIER), token_id);
         let asset_address = object::create_object_address(
             &@admin_addr,
             create_token_seed(&collection_name, &token_name)
