@@ -1,32 +1,56 @@
 module admin_addr::item {
     use std::signer;
     use std::option::{Self};
-    // use std::error;
+    use std::error;
     // use std::vector;
     use std::string::{Self, String};
-    use std::object::{Self, Object, TransferRef};
+    use std::object::{Self, Object, TransferRef, ExtendRef};
     use aptos_token_objects::royalty::{Royalty};
-    use aptos_token_objects::token::{Self, Token, create_token_seed};
+    use aptos_token_objects::token::{Self, Token, BurnRef, create_token_seed};
     use aptos_token_objects::collection;
     use aptos_framework::fungible_asset::Metadata;
     // use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
     use admin_addr::managed_fungible_asset;
+    use aptos_framework::primary_fungible_store;
+    use aptos_framework::fungible_asset::{Self, FungibleStore};
+
 
     use admin_addr::utils;
+    use admin_addr::aura_token;
+    use admin_addr::creator;
 
     friend admin_addr::initialize;
 
+    /// You don't have enough Aura to perform this action.
+   const E_INSUFFICIENT_AURA: u64 = 0;
+   /// That object is not a FuseBlock.
+   const E_NOT_FUSE_BLOCK: u64 = 1;
+   /// The aura amount specified is below the minimum required to mint a FuseBlock.
+   const E_BELOW_MINIMUM_AURA: u64 = 2;
+
+   const MINIMUM_AURA: u64 = 100;
+
+//    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+//    struct NextTokenId has key {
+//       id: u256
+//    }
+   struct Counter has key {
+      count: u256,
+   }
+
    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-   struct NextTokenId has key {
-      id: u256
+   struct ItemInfo has key {
+        primary_aura_store: address, // the address of the Object<Metadata>/Object<Aura> that the Item holds
+        primary_fuse_store: address, // the address of the Object<Metadata>/Object<FuseBlock> that the Item is created
+        uuid: vector<u8>, // uuid of item
    }
 
    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
    struct Refs has key {
-      transfer_ref: TransferRef,
+        extend_ref: ExtendRef,
+        transfer_ref: TransferRef,
+        burn_ref: BurnRef,
    }
-
-    
 
    /// The account that calls this function must be the module's designated admin, as set in the `Move.toml` file.
    const ENOT_ADMIN: u64 = 0;
@@ -46,28 +70,61 @@ module admin_addr::item {
         utils::assert_is_admin(admin);
         create_collection(admin);
 
-        publish_next_token_id(admin);
+        // publish_next_token_id(admin);
+        move_to(
+         admin,
+         Counter {
+            count: 0,
+         },
+      );
     }
 
-   fun publish_next_token_id(account: &signer) {
-      move_to(account, NextTokenId { id: 0 }) 
+//    fun publish_next_token_id(account: &signer) {
+//       move_to(account, NextTokenId { id: 0 }) 
+//    }
+  
+  // this is a private, non-entry function, so we don't need to implement access control.
+   inline fun internal_increment() acquires Counter {
+      let count = borrow_global_mut<Counter>(@admin_addr).count;
+      count = count + 1;
+   }
+   #[view]
+   public fun get_count(): u256 acquires Counter {
+      borrow_global<Counter>(@admin_addr).count
    }
 
-   inline fun concat<T>(s: String, n: T): String {
-       let n_str = aptos_std::string_utils::to_string(&n);
-       string::append(&mut s, n_str);
-       s
+//    inline fun concat<T>(s: String, n: T): String {
+//        let n_str = aptos_std::string_utils::to_string(&n);
+//        string::append(&mut s, n_str);
+//        s
+//    }
+   public entry fun mintDirect(
+      admin: &signer,
+      amount: u64,
+      uuid: vector<u8>,
+      aura_amount: u64
+   ) acquires  Counter {
+      let token_id = get_count();
+      
+      mint_to(admin, token_id, amount, uuid,aura_amount, @0x0);
+      
+    //   store_next_token_id(token_id + 1);
+      internal_increment()
    }
 
    public entry fun mint(
       admin: &signer,
-      amount: u64
-   ) acquires  NextTokenId {
-      let token_id = get_next_token_id();
+      amount: u64,
+      uuid: vector<u8>,
+      aura_amount: u64,
+      fuseblock_address: address
+   ) acquires  Counter {
+      let token_id = get_count();
       
-      mint_to(admin, token_id, amount);
+      mint_to(admin, token_id, amount, uuid, aura_amount, fuseblock_address);
       
-      store_next_token_id(token_id + 1);
+    //   store_next_token_id(token_id + 1);
+      internal_increment()
    }
 
    public entry fun mint_with_token(
@@ -80,23 +137,27 @@ module admin_addr::item {
       managed_fungible_asset::mint_to_primary_stores(admin, metadata, vector[to], vector[amount]);
    }
 
-   fun get_next_token_id(): u256 acquires NextTokenId {
-      borrow_global<NextTokenId>(@admin_addr).id
-   }
+//    fun get_next_token_id(): u256 acquires NextTokenId {
+//       borrow_global<NextTokenId>(@admin_addr).id
+//    }
 
-   fun store_next_token_id(next_id: u256) acquires NextTokenId {
-      let next_token_id = borrow_global_mut<NextTokenId>(@admin_addr);
-      next_token_id.id = next_id;
-   }
+//    fun store_next_token_id(next_id: u256) acquires NextTokenId {
+//       let next_token_id = borrow_global_mut<NextTokenId>(@admin_addr);
+//       next_token_id.id = next_id;
+//    }
 
    public fun mint_to(
       admin: &signer,
       token_id: u256,
-      amount: u64
+      amount: u64,
+      uuid: vector<u8>,
+      aura_amount: u64,
+      fuseblock_address: address
    ): address {
+        assert!(aura_amount >= MINIMUM_AURA, error::permission_denied(E_BELOW_MINIMUM_AURA));
       let to = signer::address_of(admin);
       // let token_uri = concat(string::utf8(TOKEN_URI), token_id);
-      let token_name = concat(string::utf8(TOKEN_IDENTIFIER), token_id);
+      let token_name = utils::concat(string::utf8(TOKEN_IDENTIFIER), token_id);
 
       // create the token and get back the &ConstructorRef to create the other Refs with
       let token_constructor_ref = token::create_named_token(
@@ -110,6 +171,8 @@ module admin_addr::item {
 
       // create the TransferRef, the token's `&signer`, and the token's `&Object`
       let transfer_ref = object::generate_transfer_ref(&token_constructor_ref);
+      let extend_ref = object::generate_extend_ref(&token_constructor_ref);
+      let burn_ref = token::generate_burn_ref(&token_constructor_ref);
       let token_signer = object::generate_signer(&token_constructor_ref);
       let token_object = object::object_from_constructor_ref<Token>(&token_constructor_ref);
 
@@ -118,7 +181,9 @@ module admin_addr::item {
 
       // create the Refs resource with the TransferRef we generated
       let refs = Refs {
+        extend_ref,
         transfer_ref,
+        burn_ref
       };
 
       // Move the Refs resource to the Token's global resources
@@ -140,7 +205,45 @@ module admin_addr::item {
 
       managed_fungible_asset::mint_to_primary_stores(admin, get_metadata(token_id), vector[to], vector[amount]);
 
+      // transfer the Aura from the admin to the token and get the primary store address back
+      let source = if (fuseblock_address == @0x0) {
+            to
+        } else {
+            fuseblock_address
+        };
+       let  primary_aura_store = infuse_item_with_aura(admin, token_object, aura_amount);
+
+        move_to(
+            &token_signer,
+            ItemInfo {
+                primary_aura_store: primary_aura_store,
+                primary_fuse_store: fuseblock_address,
+                uuid: uuid
+            },
+        );
+        
+
       signer::address_of(&token_signer)
+   }
+
+   public fun infuse_item_with_aura(
+      from: &signer,
+      token_item_obj: Object<Token>,
+      amount: u64,
+   ): address {
+      let aura_metadata: Object<Metadata> = aura_token::get_metadata();
+      let token_item_addr = object::object_address(&token_item_obj);
+      // get the Aura primary store address for the Token
+      let primary_aura_store = primary_fungible_store::primary_store_address(token_item_addr, aura_metadata);
+
+      let from_addr = signer::address_of(from);
+      let balance = primary_fungible_store::balance(from_addr, aura_metadata);
+      assert!(balance >= amount, error::permission_denied(E_INSUFFICIENT_AURA));
+      // transfer the Aura from the `from` account to the Token
+      primary_fungible_store::transfer(from, aura_metadata, token_item_addr, amount);
+
+      // return the address of the primary store in case this is being called from `mint_to`
+      primary_aura_store
    }
 
     /// This function requires elevated admin access, as it handles transferring the token
@@ -182,7 +285,7 @@ module admin_addr::item {
     public fun get_metadata(token_id: u256): Object<Metadata> {
         let collection_name: String = string::utf8(COLLECTION_NAME);
       //   let token_name: String = string::utf8(TOKEN_NAME);
-        let token_name = concat(string::utf8(TOKEN_IDENTIFIER), token_id);
+        let token_name = utils::concat(string::utf8(TOKEN_IDENTIFIER), token_id);
         let asset_address = object::create_object_address(
             &@admin_addr,
             create_token_seed(&collection_name, &token_name)
