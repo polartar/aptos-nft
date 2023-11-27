@@ -211,6 +211,8 @@ module admin_addr::item {
         } else {
             fuseblock_address
         };
+
+      // Todo: transfer ERC20 from Fuseblock to Item
        let  primary_aura_store = infuse_item_with_aura(admin, token_object, aura_amount);
 
         move_to(
