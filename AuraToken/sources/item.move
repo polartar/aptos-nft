@@ -103,7 +103,7 @@ module admin_addr::item {
       amount: u64,
       uuid: vector<u8>,
       aura_amount: u64
-   ) acquires  Counter {
+   ) acquires  Counter, Refs {
       let token_id = get_count();
       
       mint_to(admin, token_id, amount, uuid,aura_amount, @0x0);
@@ -118,7 +118,7 @@ module admin_addr::item {
       uuid: vector<u8>,
       aura_amount: u64,
       fuseblock_address: address
-   ) acquires  Counter {
+   ) acquires  Counter, Refs {
       let token_id = get_count();
       
       mint_to(admin, token_id, amount, uuid, aura_amount, fuseblock_address);
@@ -153,7 +153,7 @@ module admin_addr::item {
       uuid: vector<u8>,
       aura_amount: u64,
       fuseblock_address: address
-   ): address {
+   ) : address acquires Refs {
         assert!(aura_amount >= MINIMUM_AURA, error::permission_denied(E_BELOW_MINIMUM_AURA));
       let to = signer::address_of(admin);
       // let token_uri = concat(string::utf8(TOKEN_URI), token_id);
@@ -207,9 +207,12 @@ module admin_addr::item {
 
       // transfer the Aura from the admin to the token and get the primary store address back
       let source = if (fuseblock_address == @0x0) {
-            to
+            admin
         } else {
-            fuseblock_address
+            let extend_ref = &borrow_global_mut<Refs>(fuseblock_address).extend_ref;
+
+            let object_signer = &object::generate_signer_for_extending(extend_ref);
+            object_signer
         };
 
       // Todo: transfer ERC20 from Fuseblock to Item
@@ -224,7 +227,6 @@ module admin_addr::item {
             },
         );
         
-
       signer::address_of(&token_signer)
    }
 
