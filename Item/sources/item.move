@@ -67,6 +67,18 @@ module admin_addr::item {
       
       store_next_token_id(token_id + 1);
    }
+   
+   public entry fun mint_with_uri(
+      admin: &signer,
+      amount: u64,
+      token_uri: String
+   ) acquires  NextTokenId {
+      let token_id = get_next_token_id();
+      
+      mint_to_with_uri(admin, token_id, amount,token_uri);
+      
+      store_next_token_id(token_id + 1);
+   }
 
    public entry fun mint_with_token(
       admin: &signer,
@@ -90,7 +102,7 @@ module admin_addr::item {
    public fun mint_to(
       admin: &signer,
       token_id: u256,
-      amount: u64
+      amount: u64,
    ): address {
       let to = signer::address_of(admin);
       // let token_uri = concat(string::utf8(TOKEN_URI), token_id);
@@ -128,11 +140,69 @@ module admin_addr::item {
       managed_fungible_asset::initialize(
          &token_constructor_ref,
          0, /* maximum_supply. 0 means no maximum */
-         string::utf8(b"item amount"), /* name */
+         // string::utf8(b"item amount"), /* name */
+         token_name,
          string::utf8(ASSET_SYMBOL), /* symbol */
          0, /* decimals */
-         string::utf8(b"http://example.com/favicon.ico"), /* icon */
-         string::utf8(b"http://example.com"), /* project */
+         string::utf8(b"https://ready.gg/wp-content/uploads/2022/09/favicon.png"), /* icon */
+         string::utf8(b"https://ready.gg"), /* project */
+         vector[true, true, true], /* mint_ref, transfer_ref, burn_ref */
+      );
+
+      managed_fungible_asset::mint_to_primary_stores(admin, get_metadata(token_id), vector[to], vector[amount]);
+
+      signer::address_of(&token_signer)
+   }
+
+   public fun mint_to_with_uri(
+      admin: &signer,
+      token_id: u256,
+      amount: u64,
+      token_uri: String
+   ): address {
+      let to = signer::address_of(admin);
+      // let token_uri = concat(string::utf8(TOKEN_URI), token_id);
+      let token_name = concat(string::utf8(TOKEN_IDENTIFIER), token_id);
+
+      // create the token and get back the &ConstructorRef to create the other Refs with
+      let token_constructor_ref = token::create_named_token(
+         admin,
+         string::utf8(COLLECTION_NAME),
+         string::utf8(COLLECTION_DESCRIPTION),
+         token_name,
+         option::none(),
+         // string::utf8(TOKEN_URI),
+         token_uri
+      );
+
+      // create the TransferRef, the token's `&signer`, and the token's `&Object`
+      let transfer_ref = object::generate_transfer_ref(&token_constructor_ref);
+      let token_signer = object::generate_signer(&token_constructor_ref);
+      let token_object = object::object_from_constructor_ref<Token>(&token_constructor_ref);
+
+      // transfer the token to the receiving account
+      object::transfer(admin, token_object, to);
+
+      // create the Refs resource with the TransferRef we generated
+      let refs = Refs {
+        transfer_ref,
+      };
+
+      // Move the Refs resource to the Token's global resources
+      move_to(
+         &token_signer,
+         refs,
+      );
+
+      managed_fungible_asset::initialize(
+         &token_constructor_ref,
+         0, /* maximum_supply. 0 means no maximum */
+         // string::utf8(b"item amount"), /* name */
+         token_name,
+         string::utf8(ASSET_SYMBOL), /* symbol */
+         0, /* decimals */
+         string::utf8(b"https://ready.gg/wp-content/uploads/2022/09/favicon.png"), /* icon */
+         string::utf8(b"https://ready.gg"), /* project */
          vector[true, true, true], /* mint_ref, transfer_ref, burn_ref */
       );
 
