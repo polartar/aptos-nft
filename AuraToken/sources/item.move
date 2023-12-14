@@ -12,12 +12,12 @@ module admin_addr::item {
     // use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
     use admin_addr::managed_fungible_asset;
     use aptos_framework::primary_fungible_store;
-    use aptos_framework::fungible_asset::{Self, FungibleStore};
+   //  use aptos_framework::fungible_asset::{Self, FungibleStore};
 
 
     use admin_addr::utils;
     use admin_addr::aura_token;
-    use admin_addr::creator;
+   //  use admin_addr::creator;
 
     friend admin_addr::initialize;
 
@@ -85,8 +85,7 @@ module admin_addr::item {
   
   // this is a private, non-entry function, so we don't need to implement access control.
    inline fun internal_increment() acquires Counter {
-      let count = borrow_global_mut<Counter>(@admin_addr).count;
-      count = count + 1;
+      borrow_global_mut<Counter>(@admin_addr).count = borrow_global_mut<Counter>(@admin_addr).count + 1
    }
    #[view]
    public fun get_count(): u256 acquires Counter {
@@ -154,7 +153,7 @@ module admin_addr::item {
       amount: u64,
       uuid: vector<u8>,
       aura_amount: u64,
-      fuseblock_address: address
+      fuseblock_address: address,
       token_uri: String
    ) : address acquires Refs {
         assert!(aura_amount >= MINIMUM_AURA, error::permission_denied(E_BELOW_MINIMUM_AURA));
@@ -220,7 +219,7 @@ module admin_addr::item {
         };
 
       // Todo: transfer ERC20 from Fuseblock to Item
-       let  primary_aura_store = infuse_item_with_aura(admin, token_object, aura_amount);
+       let  primary_aura_store = infuse_item_with_aura(source, token_object, aura_amount);
 
         move_to(
             &token_signer,
