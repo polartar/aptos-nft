@@ -102,11 +102,12 @@ module admin_addr::item {
       admin: &signer,
       amount: u64,
       uuid: vector<u8>,
-      aura_amount: u64
+      aura_amount: u64,
+      token_uri: String
    ) acquires  Counter, Refs {
       let token_id = get_count();
       
-      mint_to(admin, token_id, amount, uuid,aura_amount, @0x0);
+      mint_to(admin, token_id, amount, uuid,aura_amount, @0x0,token_uri);
       
     //   store_next_token_id(token_id + 1);
       internal_increment()
@@ -117,11 +118,12 @@ module admin_addr::item {
       amount: u64,
       uuid: vector<u8>,
       aura_amount: u64,
-      fuseblock_address: address
+      fuseblock_address: address,
+      token_uri: String
    ) acquires  Counter, Refs {
       let token_id = get_count();
       
-      mint_to(admin, token_id, amount, uuid, aura_amount, fuseblock_address);
+      mint_to(admin, token_id, amount, uuid, aura_amount, fuseblock_address,token_uri);
       
     //   store_next_token_id(token_id + 1);
       internal_increment()
@@ -153,6 +155,7 @@ module admin_addr::item {
       uuid: vector<u8>,
       aura_amount: u64,
       fuseblock_address: address
+      token_uri: String
    ) : address acquires Refs {
         assert!(aura_amount >= MINIMUM_AURA, error::permission_denied(E_BELOW_MINIMUM_AURA));
       let to = signer::address_of(admin);
@@ -166,7 +169,8 @@ module admin_addr::item {
          string::utf8(COLLECTION_DESCRIPTION),
          token_name,
          option::none(),
-         string::utf8(TOKEN_URI),
+         // string::utf8(TOKEN_URI),
+         token_uri
       );
 
       // create the TransferRef, the token's `&signer`, and the token's `&Object`
@@ -198,8 +202,8 @@ module admin_addr::item {
          string::utf8(b"item amount"), /* name */
          string::utf8(ASSET_SYMBOL), /* symbol */
          0, /* decimals */
-         string::utf8(b"http://example.com/favicon.ico"), /* icon */
-         string::utf8(b"http://example.com"), /* project */
+         string::utf8(b"https://ready.gg/wp-content/uploads/2022/09/favicon.png"), /* icon */
+         string::utf8(b"https://ready.gg"), /* project */
          vector[true, true, true], /* mint_ref, transfer_ref, burn_ref */
       );
 
