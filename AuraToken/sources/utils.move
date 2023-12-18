@@ -15,5 +15,5 @@ module admin_addr::utils {
        let n_str = string_utils::to_string(&n);
        string::append(&mut s, n_str);
        s
-   }
+    }
 }

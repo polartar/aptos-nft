@@ -52,8 +52,8 @@ module admin_addr::fuse_block {
    // Collection configuration details
    const COLLECTION_NAME: vector<u8> = b"Fuse Block";
    const COLLECTION_DESCRIPTION: vector<u8> = b"A collection of Fuse Blocks";
-   const COLLECTION_URI: vector<u8> = b"collection image uri";
-   const BASE_TOKEN_URI: vector<u8> = b"https://www.fhsffshfsfsdhfs.com/token_image_uri/";
+   const COLLECTION_URI: vector<u8> = b"https://ready.gg/wp-content/uploads/2022/11/Screen-Shot-2022-11-02-at-21.38.01.png";
+   const BASE_TOKEN_URI: vector<u8> = b"https://assets.wenmint.com/images/farmacyfantoms/";
    const BASE_TOKEN_NAME: vector<u8> = b"FuseBlock #";
 
    /// Ensure that the deployer is the @admin of the module, then create the collection.
@@ -72,7 +72,7 @@ module admin_addr::fuse_block {
       move_to(
          admin,
          Counter {
-            count: 0,
+            count: 1,
          },
       );
    }
@@ -81,10 +81,10 @@ module admin_addr::fuse_block {
    /// Anyone can call it as long as they have the Aura to do so.
    /// It mints a FuseBlock NFT to the `minter` and exchanges the specified amount of Aura for the FuseBlock's Aura.
    /// The `minter` must at least have `MINIMUM_AURA` Aura to mint a FuseBlock.
-   public fun mint_to(
+   public entry fun mint_to(
       minter: &signer,
       aura_amount: u64,
-   ): address acquires Refs, Counter {
+   ) acquires Refs, Counter {
       assert!(aura_amount >= MINIMUM_AURA, error::permission_denied(E_BELOW_MINIMUM_AURA));
 
       // mint the FuseBlock NFT to the minter
@@ -102,8 +102,9 @@ module admin_addr::fuse_block {
             meets_requirement: false,
          },
       );
+      internal_increment();
 
-      signer::address_of(&token_signer)
+      // signer::address_of(&token_signer)
    }
 
    public entry fun set_meets_requirement(
@@ -249,8 +250,8 @@ module admin_addr::fuse_block {
 
    // this is a private, non-entry function, so we don't need to implement access control.
    inline fun internal_increment() acquires Counter {
-      let count = borrow_global_mut<Counter>(@admin_addr).count;
-      count = count + 1;
+      let counter = borrow_global_mut<Counter>(@admin_addr);
+      counter.count = counter.count + 1; 
    }
 
    inline fun internal_get_fuse_block_signer<T: key>(
@@ -279,6 +280,7 @@ module admin_addr::fuse_block {
       let count = get_count();
       let token_name = utils::concat(string::utf8(BASE_TOKEN_NAME), count);
       let token_uri = utils::concat(string::utf8(BASE_TOKEN_URI), count);
+      token_uri = utils::concat(token_uri, string::utf8(b".png"));
       (token_name, token_uri)
    }
 

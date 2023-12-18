@@ -28,8 +28,8 @@ module admin_addr::aura_token {
             utf8(AURA_TOKEN_NAME), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
-            utf8(b"http://example.com/favicon.ico"), /* icon */
-            utf8(b"http://example.com"), /* project */
+            utf8(b"https://ready.gg/wp-content/uploads/2022/09/doughnut.png"), /* icon */
+            utf8(b"https://ready.gg"), /* project */
             vector[true, true, true], /* mint_ref, transfer_ref, burn_ref */
         );
     }

@@ -58,7 +58,7 @@ module admin_addr::item {
    // Collection configuration details
    const COLLECTION_NAME: vector<u8> = b"Items";
    const COLLECTION_DESCRIPTION: vector<u8> = b"A collection of items";
-   const COLLECTION_URI: vector<u8> = b"https://fastly.picsum.photos/id/568/200/300.jpg?hmac=vQmkZRQt1uS-LMo2VtIQ7fn08mmx8Fz3Yy3lql5wkzM";
+   const COLLECTION_URI: vector<u8> = b"https://ready.gg/wp-content/uploads/2022/10/Nft-card-4-2-1-e1666777092619.png";
    const TOKEN_URI: vector<u8> = b"https://fastly.picsum.photos/id/838/200/300.jpg?hmac=yns6FqTn8FmJq3qluHDmnjn6X4x-rC4lGjZVUIMknuI";
    const TOKEN_IDENTIFIER: vector<u8> = b"Infuse Item #";
 
@@ -74,7 +74,7 @@ module admin_addr::item {
         move_to(
          admin,
          Counter {
-            count: 0,
+            count: 1,
          },
       );
     }
