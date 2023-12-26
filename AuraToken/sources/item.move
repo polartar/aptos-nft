@@ -42,7 +42,7 @@ module admin_addr::item {
    struct ItemInfo has key {
         primary_aura_store: address, // the address of the Object<Metadata>/Object<Aura> that the Item holds
         primary_fuse_store: address, // the address of the Object<Metadata>/Object<FuseBlock> that the Item is created
-        uuid: vector<u8>, // uuid of item
+        uuid: String, // uuid of item
    }
 
    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -100,7 +100,7 @@ module admin_addr::item {
    public entry fun mintDirect(
       admin: &signer,
       amount: u64,
-      uuid: vector<u8>,
+      uuid: String,
       aura_amount: u64,
       token_uri: String
    ) acquires  Counter, Refs {
@@ -115,7 +115,7 @@ module admin_addr::item {
    public entry fun mint(
       admin: &signer,
       amount: u64,
-      uuid: vector<u8>,
+      uuid: String,
       aura_amount: u64,
       fuseblock_address: address,
       token_uri: String
@@ -151,7 +151,7 @@ module admin_addr::item {
       admin: &signer,
       token_id: u256,
       amount: u64,
-      uuid: vector<u8>,
+      uuid: String,
       aura_amount: u64,
       fuseblock_address: address,
       token_uri: String

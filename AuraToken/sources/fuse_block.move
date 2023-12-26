@@ -280,7 +280,8 @@ module admin_addr::fuse_block {
       let count = get_count();
       let token_name = utils::concat(string::utf8(BASE_TOKEN_NAME), count);
       let token_uri = utils::concat(string::utf8(BASE_TOKEN_URI), count);
-      token_uri = utils::concat(token_uri, string::utf8(b".png"));
+      string::append(&mut token_uri, string::utf8(b".png"));
+
       (token_name, token_uri)
    }
 
